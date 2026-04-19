@@ -46,6 +46,13 @@ public class ForkPDFLayoutTextStripper extends PDFTextStripper {
 
 	public static final int OUTPUT_SPACE_CHARACTER_WIDTH_IN_PT = 4;
 
+	/**
+	 * Defensive upper bound on the number of empty lines that may be inserted between two
+	 * consecutive {@link TextPosition}s. Any real PDF layout produces a value well below
+	 * this; anything higher indicates a malformed document (see gh-5829).
+	 */
+	static final int MAX_NEW_LINES_PER_POSITION_GAP = 500;
+
 	private double currentPageWidth;
 
 	private @Nullable TextPosition previousTextPosition;
@@ -169,8 +176,17 @@ public class ForkPDFLayoutTextStripper extends PDFTextStripper {
 
 		if (textYPosition > previousTextYPosition && (textYPosition - previousTextYPosition > 5.5)) {
 			double height = textPosition.getHeight();
+			// gh-5829: degenerate TextPositions (e.g. zero-height whitespace with a
+			// y-offset greater than 5.5) would otherwise compute
+			// Math.floor(delta) / 0.0 == POSITIVE_INFINITY, cast to Integer.MAX_VALUE,
+			// and trigger a multi-hundred-GB allocation in createNewEmptyNewLines.
+			// Fall back to the existing minimum (1) when we cannot compute a
+			// meaningful line count.
+			if (!Double.isFinite(height) || height <= 0.0) {
+				return 1;
+			}
 			int numberOfLines = (int) (Math.floor(textYPosition - previousTextYPosition) / height);
-			numberOfLines = Math.max(1, numberOfLines - 1); // exclude current new line
+			numberOfLines = Math.max(1, Math.min(numberOfLines - 1, MAX_NEW_LINES_PER_POSITION_GAP));
 			if (DEBUG) {
 				System.out.println(height + " " + numberOfLines);
 			}
