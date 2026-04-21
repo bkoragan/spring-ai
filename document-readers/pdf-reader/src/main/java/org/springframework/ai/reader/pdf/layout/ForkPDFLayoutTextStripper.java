@@ -48,10 +48,13 @@ public class ForkPDFLayoutTextStripper extends PDFTextStripper {
 
 	/**
 	 * Defensive upper bound on the number of empty lines that may be inserted between two
-	 * consecutive {@link TextPosition}s. Any real PDF layout produces a value well below
-	 * this; anything higher indicates a malformed document (see gh-5829).
+	 * consecutive {@link TextPosition}s. Chosen well below the threshold where
+	 * {@code ExtractedTextFormatter.trimAdjacentBlankLines} becomes unstable on long
+	 * blank-line runs (gh-2247), so the stripper's output can always be safely fed
+	 * through the default reader pipeline. Covers any realistic paragraph or section
+	 * break; anything higher indicates a malformed document (see gh-5829).
 	 */
-	static final int MAX_NEW_LINES_PER_POSITION_GAP = 500;
+	static final int MAX_NEW_LINES_PER_POSITION_GAP = 20;
 
 	private double currentPageWidth;
 
